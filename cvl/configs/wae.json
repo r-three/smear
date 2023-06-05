@@ -1,0 +1,9 @@
+{
+    "dataset": "Shapes",
+    "latent_dim": 4,
+    "categorical_dim": 8,
+    "model": "wae_shapes",
+    "warmup_ratio": 0.1,
+    "batch_size": 64,
+    "lr": 1e-4
+}

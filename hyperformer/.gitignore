@@ -1,0 +1,17 @@
+build/
+dist/
+env/
+hyperformer.egg-info/
+hyperformer/.lock
+hyperformer/__pycache__/
+hyperformer/adapters/__pycache__/
+hyperformer/data/__pycache__/
+hyperformer/metrics/__pycache__/
+hyperformer/outputs*/
+hyperformer/runs/
+hyperformer/third_party/__pycache__/
+hyperformer/third_party/models/__pycache__/
+hyperformer/third_party/trainers/__pycache__/
+hyperformer/third_party/utils/__pycache__/
+hyperformer/utils/__pycache__/
+hyperformer/temp_jsons/
