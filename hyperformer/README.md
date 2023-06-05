@@ -18,7 +18,7 @@ Before running the code, create a directory named `temp_jsons` inside the `hyper
 
 ## Training and Testing
 
-The repository provides different commands for training and testing the models with various routing methods. Use the following commands to run on a single GPU to ensure the same hyperparameters as we used:
+The repository provides different commands for training and testing the models with various routing methods. To ensure the validity of the hyperparameters we used, execute the following commands on a single GPU::
 
 ### SMEAR
 
