@@ -95,9 +95,7 @@ python src/train.py -c configs/default.json -k seed=42 routing_estimator="switch
 
 **ST-Gumbel:**
 ```
-python src/train.py -c configs/default.json -k seed=42 routing_estimator="gs_st_routing" exp_name="gs_st_routing_resnet
-
-18_lr1e3_bd32_seed42_steps100k"
+python src/train.py -c configs/default.json -k seed=42 routing_estimator="gs_st_routing" exp_name="gs_st_routing_resnet18_lr1e3_bd32_seed42_steps100k"
 ```
 
 **1x Parameters:**

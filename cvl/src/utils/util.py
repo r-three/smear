@@ -10,7 +10,6 @@ import torch.nn as nn
 
 from shutil import copytree, ignore_patterns
 from src.adapters.adapter_controller_resnet_fast import AdapterController as ResNetController
-from src.adapters.adapter_controller_fast import AdapterController as ViTController
 import ipdb
 
 
@@ -163,7 +162,7 @@ def freezing_params(model, config):
         else:
             if config.train_adapters: 
                 for name, sub_module in model.named_modules():
-                    if isinstance(sub_module, (ResNetController)) or (isinstance(sub_module, (ViTController))):
+                    if isinstance(sub_module, (ResNetController)):
                         for param_name, param in sub_module.named_parameters():
                             param.requires_grad = True
                             full_name = name+'.'+param_name
