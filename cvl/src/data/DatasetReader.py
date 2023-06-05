@@ -133,7 +133,10 @@ class Reader(object):
             if split == 'train' and self.config.train_size:
                 input_file_list = f'Domainnet_train_{self.config.train_size}k.txt'
             else:
-                input_file_list = [f'{domain_name}_{split}_fold.txt' for domain_name in domain_index_dict]
+                if split == "test":
+                    input_file_list = [f'{domain_name}_{split}.txt' for domain_name in domain_index_dict]
+                else:
+                    input_file_list = [f'{domain_name}_{split}_fold.txt' for domain_name in domain_index_dict]
             if split == 'train':
                 dataset = DomainNetDataset(self.config, input_file_list, './data/DomainNet/', _train_preprocess)
             else:
