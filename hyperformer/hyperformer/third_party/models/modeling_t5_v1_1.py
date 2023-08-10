@@ -16,8 +16,6 @@ from hyperformer.adapters import (AutoAdapterController, MetaAdapterConfig,
                               MetaLayersAdapterController,
                               AdapterLayersOneHyperNetController)
 from hyperformer.adapters.adapter_controller_fast import AdapterController
-from hyperformer.adapters.lora_controller import LoRAController
-from hyperformer.adapters.ia3_controller import IA3Controller
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     Seq2SeqLMOutput

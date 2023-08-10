@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from transformers.activations import get_activation
 import torch.nn.functional as F
+import math
 
 class Activations(nn.Module):
     def __init__(self, activation_type):
@@ -149,6 +150,8 @@ class Router(nn.Module):
             adapter_logits = torch.matmul(new_x, router_weights) + self.router_bias[:,None,:]
         else:
             adapter_logits = torch.matmul(new_x, router_weights)
+        # As model dimension increase, the scaling of logits to sqrt(model_dim) is important to prevent saturation
+        # adapter_logits = adapter_logits / math.sqrt(self.in_dim)
         # (M,B,N)
         adapter_probs = F.softmax(adapter_logits, dim=-1)
 

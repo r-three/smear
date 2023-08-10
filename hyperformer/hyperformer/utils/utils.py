@@ -13,8 +13,6 @@ from hyperformer.adapters import (MetaAdapterController,
                               AdapterLayersHyperNetController, AdapterLayersOneHyperNetController)
 # from hyperformer.adapters import AdapterController
 from hyperformer.adapters.adapter_controller_fast import AdapterController
-from hyperformer.adapters.lora_controller import LoRAController
-from hyperformer.adapters.ia3_controller import IA3Controller
 from hyperformer.data import TASK_MAPPING
 import pdb
 
@@ -120,7 +118,7 @@ def freezing_params(model, training_args, model_args, adapter_args):
     if training_args.train_adapters or adapter_args.train_lora or adapter_args.train_ia3:
         freeze_params(model)
         for name, sub_module in model.named_modules():
-            if isinstance(sub_module, (AdapterController, LoRAController, IA3Controller)):
+            if isinstance(sub_module, (AdapterController)):
                 for param_name, param in sub_module.named_parameters():
                     if adapter_args.only_train_router:
                         if ('router' in name+param_name) or ('baseline' in name+param_name) or ('decoder' in name+param_name):
