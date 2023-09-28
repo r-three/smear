@@ -266,6 +266,7 @@ class AdapterTrainingArguments:
     eval_time: Optional[float] = field(default=0.0, metadata={"help": "times up the eval method"})
     cosine_router: Optional[bool] = field(default=False, metadata={"help": "use cosine when calculating the routing distribution"})
     skill_lr_ratio: Optional[float] = field(default=10.0, metadata={"help": "ratio of lr for skill adapters"})
+    dselectk1_mode: Optional[bool] = field(default=False, metadata={"help": "top1 mode for dselectk one-hot routing"})
 
 
 

@@ -145,6 +145,7 @@ class Adapter(nn.Module):
             inp = x.unsqueeze(1).repeat(1, self.config.num_adapters, 1, 1)
             # (M, B, N, S, down_size)
             z = torch.matmul(inp[None, :,:,:,:], batch_down_samplers_weights) + batch_down_samplers_bias[:,:,:,None,:]
+            z = self.activation(z)
         else:        
             #(M,B,S,down_size)
             z = torch.matmul(x[None,:,:,:], batch_down_samplers_weights) + batch_down_samplers_bias[:,:,None,:]
@@ -315,6 +316,13 @@ class AdapterController(nn.Module):
                 mask = mask.unsqueeze(0).repeat(self.n_routers, 1,1)
                 expert_index = torch.argmax(mask, dim=-1)
 
+            elif routing_estimator == 'dselectk_routing':
+                z_sent = torch.mean(z, dim=1)
+                if self.training:
+                    dselectk_expert_weights, load_loss = self.multi_routers(z_sent)
+                else:
+                    dselectk_expert_weights = self.multi_routers(z_sent)
+
             else:
                 if given_hidden_states is not None:
                     if self.config.token_dropout != 0:
@@ -407,6 +415,16 @@ class AdapterController(nn.Module):
             adapter_probs = adapter_probs.unsqueeze(0).repeat(self.config.num_routers, 1,1)
             #(M,B,S,C)
             outputs = self.multi_adapters(z, None, adapter_probs)  
+        elif routing_estimator == "dselectk_routing":
+            if not self.config.dselectk1_mode:
+                # hacky way to re use soft_routing method for dselectk_routing during training and eval
+                self.config.routing_estimator = "soft_routing"
+                outputs = self.multi_adapters(z, None, dselectk_expert_weights)
+                self.config.routing_estimator = "dselectk_routing"
+            else:
+                # regular index selection at test time
+                probs, expert_index = dselectk_expert_weights.max(dim=-1)
+                outputs = self.multi_adapters(z, expert_index)
         else:
             #(M,B,S,C)
             outputs = self.multi_adapters(z, expert_index)

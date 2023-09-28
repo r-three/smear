@@ -124,6 +124,14 @@ class Adapter(nn.Module):
             u = u.unsqueeze(0)
             return u
 
+        if self.config.routing_estimator == "soft_input_routing":
+            # prob_dist (batch_size, num_tokens, num_adapters, num_slots_per_adapter)
+            bs, num_tokens, num_adapters, num_slots_per_adapter = prob_dist.shape
+            D = F.softmax(prob_dist, dim=1)
+            C = F.softmax(prob_dist.view(bs, num_tokens, -1), dim=2)
+            C = C.view(bs, num_tokens, num_adapters, num_slots_per_adapter)
+            xs = torch.einsum('bmd,bmnp->bnpd', x, D)
+
         if prob_dist is not None:
             if self.config.routing_estimator == 'soft_routing':
                 M, N, C, down_size = down_samplers_weights.shape
@@ -131,6 +139,11 @@ class Adapter(nn.Module):
                 batch_down_samplers_weights = down_samplers_weights.unsqueeze(1).repeat(1, batch_size, 1, 1, 1)
                 # (M, B, N, down_size)
                 batch_down_samplers_bias = down_samplers_bias.unsqueeze(1).repeat(1, batch_size, 1, 1)
+            elif self.config.routing_estimator == 'soft_input_routing':
+                # (N, C, down_size)
+                down_samplers_weights = down_samplers_weights.squeeze(0)
+                # (N, down_size)
+                down_samplers_bias = down_samplers_bias.squeeze(0)
             else:
                 M, N, C, down_size = down_samplers_weights.shape
                 # (M,N,C*down_size)
@@ -151,6 +164,11 @@ class Adapter(nn.Module):
             inp = x.unsqueeze(1).repeat(1, self.config.num_adapters, 1, 1)
             # (M, B, N, S, down_size)
             z = torch.matmul(inp[None, :,:,:,:], batch_down_samplers_weights) + batch_down_samplers_bias[:,:,:,None,:]
+            z = self.activation(z)
+        elif self.config.routing_estimator == 'soft_input_routing':
+            z = torch.einsum('bnpd,ndr->bnpr', xs, down_samplers_weights)
+            z = z + down_samplers_bias[None, :, None, :]
+            z = self.activation(z)
         else:
             #(M,B,S,down_size)
             z = torch.matmul(x[None,:,:,:], batch_down_samplers_weights) + batch_down_samplers_bias[:,:,None,:]
@@ -161,6 +179,9 @@ class Adapter(nn.Module):
                 M, N, down_size, C = up_samplers_weights.shape
                 # (M, B, N, down_size, C)
                 batch_up_samplers_weights = up_samplers_weights.unsqueeze(1).repeat(1, batch_size, 1, 1, 1)
+            elif self.config.routing_estimator == 'soft_input_routing':
+                # (N, down_size, C)
+                up_samplers_weights = up_samplers_weights.squeeze(0)
             else:
                 M, N, down_size, C = up_samplers_weights.shape
                 # (M, N, down_size*C)
@@ -179,6 +200,10 @@ class Adapter(nn.Module):
             u = prob_dist[:,:,:,None,None] * u 
             # (M, B, S, C)
             u = torch.sum(u, dim=2)
+        elif self.config.routing_estimator == 'soft_input_routing':
+            o = torch.einsum('bnpr,nrd->bnpd',z, up_samplers_weights)
+            u = torch.einsum('bnpd, bmnp->bmd', o, C)
+            u = u.unsqueeze(0)
         else:
             #(M,B,S,C)
             u = torch.matmul(z,batch_up_samplers_weights)
@@ -272,6 +297,16 @@ class AdapterController(nn.Module):
                 mask = mask.unsqueeze(0).repeat(self.n_routers, 1,1)
                 expert_index = torch.argmax(mask, dim=-1)
 
+            elif routing_estimator == "soft_input_routing":
+                logits = self.multi_routers(z)
+            
+            elif routing_estimator == "dselectk_routing":
+                z_sent = torch.mean(z, dim=1)
+                if self.training:
+                    dselectk_expert_weights, load_loss = self.multi_routers(z_sent)
+                else:
+                    dselectk_expert_weights = self.multi_routers(z_sent)
+
             else:
                 if self.config.token_dropout != 0:
                     z = self.token_dropout(z)
@@ -345,6 +380,18 @@ class AdapterController(nn.Module):
             adapter_probs = adapter_probs.unsqueeze(0).repeat(self.config.num_routers, 1,1)
             #(M,B,S,C)
             outputs = self.multi_adapters(z, None, adapter_probs)  
+        elif routing_estimator == "soft_input_routing":
+            outputs = self.multi_adapters(z, None, logits)
+        elif routing_estimator == "dselectk_routing":
+            if not self.config.dselectk1_mode:
+                # hacky way to re use soft_routing method for dselectk_routing during training and eval
+                self.config.routing_estimator = "soft_routing"
+                outputs = self.multi_adapters(z, None, dselectk_expert_weights)
+                self.config.routing_estimator = "dselectk_routing"
+            else:
+                # regular index selection at test time
+                probs, expert_index = dselectk_expert_weights.max(dim=-1)
+                outputs = self.multi_adapters(z, expert_index)
         else:
             #(M,B,S,C)
             outputs = self.multi_adapters(z, expert_index)

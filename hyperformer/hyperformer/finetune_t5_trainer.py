@@ -120,6 +120,8 @@ def main():
                     override_json[name] = (value == 'True')
                 elif name == "normalize_router_weights":
                     override_json[name] = (value == 'True')
+                elif name == "dselectk1_mode":
+                    override_json[name] = (value == 'True')
                 else:
                     raise ValueError(f"Can not override {name}")
             
@@ -273,6 +275,7 @@ def main():
     adapter_config.eval_time = adapter_args.eval_time
     adapter_config.cosine_router = adapter_args.cosine_router
     adapter_config.skill_lr_ratio = adapter_args.skill_lr_ratio
+    adapter_config.dselectk1_mode = adapter_args.dselectk1_mode
     
     if adapter_config.routing_estimator == "gs_st_routing":
         adapter_config.adapter_temp = adapter_args.adapter_temp

@@ -5,6 +5,7 @@ import torch.nn as nn
 from transformers.activations import get_activation
 import torch.nn.functional as F
 import math
+import numpy as np
 
 class Activations(nn.Module):
     def __init__(self, activation_type):
@@ -27,6 +28,21 @@ def linear_layer(input_dim, output_dim, std=1e-2):
     init_linear_layer(linear, std=std)
     return linear
 
+
+class SmoothStep(nn.Module):
+    def __init__(self, gamma=1.0):
+        super(SmoothStep, self).__init__()
+        self.lower_bound = -gamma / 2
+        self.upper_bound = gamma / 2
+        self.a3 = -2 / (gamma ** 3)
+        self.a1 = 3 / (2 * gamma)
+        self.a0 = 0.5
+
+    def forward(self, x):
+        return torch.where(
+            x <= self.lower_bound, torch.zeros_like(x),
+            torch.where(x >= self.upper_bound, torch.ones_like(x),
+                        self.a3 * (x ** 3) + self.a1 * x + self.a0))
 
 class TaskHyperNet(nn.Module):
     """This module generates the task-embeddings from the initial feeded task embeddings."""
@@ -103,10 +119,25 @@ class Router(nn.Module):
             self.in_dim = self.model_dim
         else:
             self.in_dim = in_dim
-
-        # (M,C,N)
-        self.router_weights = nn.Parameter(torch.zeros(self.n_routers, self.in_dim, self.num_adapters))
-        nn.init.normal_(self.router_weights, std=config.router_init_scale)
+        if self.config.routing_estimator == "dselectk_routing":
+            num_experts = self.config.num_adapters
+            self.num_nonzeros = 1
+            self.num_binary = math.ceil(math.log2(num_experts))
+            self.power_of_2 = (num_experts == 2**self.num_binary)
+            self.z_logits = nn.Parameter(torch.zeros(self.num_nonzeros, self.in_dim, self.num_binary))
+            nn.init.normal_(self.z_logits, std=config.router_init_scale)
+            self.smooth_step = SmoothStep(1.0)
+            binary_matrix = np.array([
+                list(np.binary_repr(val, width=self.num_binary))
+                for val in range(num_experts)
+            ]).astype(np.float32)
+            self.binary_codes = torch.from_numpy(binary_matrix).to(self.config.device)
+            self.w_logits = nn.Parameter(torch.zeros(self.in_dim, self.num_nonzeros))
+            nn.init.normal_(self.w_logits, std=config.router_init_scale)
+        else:
+            # (M,C,N)
+            self.router_weights = nn.Parameter(torch.zeros(self.n_routers, self.in_dim, self.num_adapters))
+            nn.init.normal_(self.router_weights, std=config.router_init_scale)
         if not config.no_router_bias:
             # (M,N)
             self.router_bias = nn.Parameter(torch.zeros(self.n_routers, self.num_adapters))
@@ -122,6 +153,41 @@ class Router(nn.Module):
         for i in range(self.n_routers):
             self.multi_router_weights_layer_norms[i].weight = nn.Parameter(torch.ones(self.in_dim)*config.router_init_scale)
     
+    def _compute_example_conditioned_expert_weights(self, routing_inputs): 
+        # routing_inputs shape (B,C)
+        # self.z_logits shape (num_nonzeros,C,num_binary)))
+        sample_logits = torch.einsum('bc,ncp->bnp', routing_inputs, self.z_logits).unsqueeze(2)
+
+        # Assuming _smooth_step is a differentiable approximation of the step function
+        # Here, you'd need to define this function for PyTorch, or replace it with an equivalent.
+        smooth_step_activations = self.smooth_step(sample_logits)
+        
+        # Shape = (batch_size, num_nonzeros, num_experts).
+        selector_outputs = torch.where(
+            self.binary_codes.unsqueeze(0).bool(), 
+            smooth_step_activations,
+            1 - smooth_step_activations).prod(dim=3)
+        # Weights for the single-expert selectors.
+        # Shape = (batch_size, num_nonzeros, 1).
+        selector_weights = torch.einsum('bc,cn->bn', routing_inputs, self.w_logits).unsqueeze(2)
+        selector_weights = F.softmax(selector_weights, dim=1)
+        # Sum over the single-expert selectors. Shape = (batch_size, num_experts).
+        expert_weights = (selector_weights * selector_outputs).sum(dim=1)
+        return expert_weights, selector_outputs
+
+    def forward_dselectk_routing(self,routing_inputs):
+        expert_weights, selector_outputs = (
+            self._compute_example_conditioned_expert_weights(routing_inputs))
+        if self.training:
+            reg_loss = - selector_outputs * torch.log(selector_outputs + 1e-6)
+            reg_loss = torch.mean(torch.sum(reg_loss, dim=-1))
+            if not self.power_of_2:
+                penalty_loss = 1 / torch.sum((selector_outputs + 1e-6), dim=-1)
+                penalty_loss = torch.mean(penalty_loss)
+                reg_loss = reg_loss + penalty_loss
+            return expert_weights.unsqueeze(0), reg_loss
+        return expert_weights.unsqueeze(0) 
+
     def forward(self,x):
         # x shape (B,C)
         if self.config.use_load_balancing:
@@ -132,6 +198,8 @@ class Router(nn.Module):
                 new_x.append(self.multi_router_layer_norms[i](x))
         #(M,B,C)
         new_x = torch.cat([y.unsqueeze(0) for y in new_x], dim=0)
+        if self.config.routing_estimator == "dselectk_routing":
+            return self.forward_dselectk_routing(new_x.squeeze(0))
         if self.config.normalize_router_weights:
             router_weights = []
             for i in range(self.n_routers):

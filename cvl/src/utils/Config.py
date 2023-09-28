@@ -120,6 +120,9 @@ class Config(object):
 
         # new experiments
         self.average_domain_adapters = False
+        self.num_slots_per_adapter = 1
+        self.dselectk1_mode = False
+        self.num_nonzeros = 1
         if filename:
             self.__dict__.update(json.load(open(filename)))
         if kwargs:
