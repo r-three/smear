@@ -88,7 +88,7 @@ python src/train.py -c configs/default.json -k seed=42 routing_estimator=None nu
 python src/train.py -c configs/default.json -k seed=42 routing_estimator="hash_routing" exp_name="hash_routing_resnet18_lr1e3_bd32_seed42_steps100k"
 ```
 
-**Top-K:**
+**Top-k:**
 ```
 python src/train.py -c configs/default.json -k seed=42 routing_estimator="switch_routing" expert_dropout=0.1 exp_name="switch_routing_resnet18_lr1e3_bd32_seed42_steps100k"
 ```
@@ -96,6 +96,16 @@ python src/train.py -c configs/default.json -k seed=42 routing_estimator="switch
 **ST-Gumbel:**
 ```
 python src/train.py -c configs/default.json -k seed=42 routing_estimator="gs_st_routing" exp_name="gs_st_routing_resnet18_lr1e3_bd32_seed42_steps100k"
+```
+
+**DSelect-k:**
+```
+python src/train.py -c configs/default.json -k seed=42 routing_estimator="dselectk_routing" exp_name="dselectk_routing_resnet18_lr1e3_bd32_seed42_steps100k" load_loss_weight=0.1
+```
+
+**Soft MoE:**
+```
+python src/train.py -c configs/default.json -k seed=42 routing_estimator="soft_input_routing" exp_name="soft_input_routing_resnet18_lr1e3_bd32_seed42_steps100k"
 ```
 
 **1x Parameters:**

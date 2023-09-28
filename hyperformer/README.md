@@ -80,7 +80,7 @@ python ./finetune_t5_trainer.py configs/adapter/hash_routing.json -k data_seed=4
 python ./finetune_t5_trainer.py configs/adapter/hash_routing.json -k data_seed=42 do_train=False eval_all_templates=True output_dir=<path/to/trained_directory>
 ```
 
-### Top-K
+### Top-k
 
 **Training:**
 ```shell
@@ -96,14 +96,22 @@ python ./finetune_t5_trainer.py configs/adapter/switch_routing.json -k data_seed
 
 **Training:**
 ```shell
-python ./finet
-
-une_t5_trainer.py configs/adapter/gs_st_routing.json -k data_seed=42 max_steps=600000 save_total_limit=5
+python ./finetune_t5_trainer.py configs/adapter/gs_st_routing.json -k data_seed=42 max_steps=600000 save_total_limit=5
 ```
 
 **Testing:**
 ```shell
 python ./finetune_t5_trainer.py configs/adapter/gs_st_routing.json -k data_seed=42 do_train=False eval_all_templates=True output_dir=<path/to/trained_directory>
+```
+### DSelect-k
+
+**Training:**
+```shell
+python ./finetune_t5_trainer.py configs/adapter/dselectk_routing.json -k data_seed=42 max_steps=600000 save_total_limit=5 load_loss_weight=0.1
+```
+**Testing:**
+```shell
+python ./finetune_t5_trainer.py configs/adapter/dselectk_routing.json -k data_seed=42 do_train=False eval_all_templates=True output_dir=<path/to/trained_directory>
 ```
 
 ### 1x Parameters
